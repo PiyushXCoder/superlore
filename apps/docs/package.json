@@ -2,7 +2,6 @@
   "name": "superlore-docs",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "superlore's own documentation — built with superlore. The canonical, MCP-enabled, public reference.",
   "scripts": {
     "dev": "next dev",
