@@ -61,7 +61,7 @@ export interface SuperloreRuntimeOptions {
    * (superlore's own docs always render code dark, by design — see {@link CODE_THEME}). A host that
    * wants code to follow its own theme switch can pass theme names here. Unlike `components`/the
    * plugin arrays, this IS a reactive dependency: {@link useSuperloreMdx} and {@link SuperloreDoc}
-   * recompile `source` when it changes, not only when `source` itself changes.
+   * recompile the doc whenever `codeTheme` changes, even if `source` itself hasn't.
    */
   codeTheme?: { light?: string; dark?: string };
 }
@@ -143,7 +143,8 @@ export interface SuperloreMdxState {
 /**
  * Compile `source` whenever it changes, keeping the last good render on a compile error (so an
  * in-progress edit never blanks the view). Plugin/component options are read at compile time; pass
- * stable references (module-level arrays) if they matter.
+ * stable references (module-level arrays) if they matter. `options.codeTheme` is the one exception:
+ * it also triggers a recompile on its own when it changes, even if `source` hasn't.
  */
 export function useSuperloreMdx(
   source: string,
