@@ -56,6 +56,14 @@ export interface SuperloreRuntimeOptions {
   remarkPlugins?: RuntimePlugin[];
   /** Extra rehype plugins, appended after superlore's core set (slug, Shiki code). */
   rehypePlugins?: RuntimePlugin[];
+  /**
+   * Override the Shiki theme(s) used for code blocks. Defaults to `"tokyo-night"` for both slots
+   * (superlore's own docs always render code dark, by design — see {@link CODE_THEME}). A host that
+   * wants code to follow its own theme switch can pass theme names here. Unlike `components`/the
+   * plugin arrays, this IS a reactive dependency: {@link useSuperloreMdx} and {@link SuperloreDoc}
+   * recompile the doc whenever `codeTheme` changes, even if `source` itself hasn't.
+   */
+  codeTheme?: { light?: string; dark?: string };
 }
 
 /** The result of compiling a superlore MDX string. */
@@ -85,17 +93,22 @@ const CORE_REMARK: RuntimePlugin[] = [
   // <Checklist>, GitHub alerts → Callouts. One plugin, the whole markdown-first upgrade set.
   remarkSuperlore,
 ];
-const CORE_REHYPE: RuntimePlugin[] = [
-  rehypeSlug,
-  [
-    rehypeCode,
-    {
-      ...rehypeCodeDefaultOptions,
-      engine: shikiEngine,
-      themes: { light: CODE_THEME, dark: CODE_THEME },
-    },
-  ],
-];
+function buildCoreRehype(codeTheme?: SuperloreRuntimeOptions["codeTheme"]): RuntimePlugin[] {
+  return [
+    rehypeSlug,
+    [
+      rehypeCode,
+      {
+        ...rehypeCodeDefaultOptions,
+        engine: shikiEngine,
+        themes: {
+          light: codeTheme?.light ?? CODE_THEME,
+          dark: codeTheme?.dark ?? CODE_THEME,
+        },
+      },
+    ],
+  ];
+}
 
 /**
  * Compile a superlore MDX string into a renderable component + its frontmatter. Throws on invalid
@@ -108,7 +121,7 @@ export async function compileMdxSource(
   const mod = await evaluate(source, {
     ...jsxRuntime,
     remarkPlugins: [...CORE_REMARK, ...(options.remarkPlugins ?? [])],
-    rehypePlugins: [...CORE_REHYPE, ...(options.rehypePlugins ?? [])],
+    rehypePlugins: [...buildCoreRehype(options.codeTheme), ...(options.rehypePlugins ?? [])],
   } as Parameters<typeof evaluate>[1]);
   return {
     Content: mod.default as CompiledSuperloreDoc["Content"],
@@ -130,7 +143,8 @@ export interface SuperloreMdxState {
 /**
  * Compile `source` whenever it changes, keeping the last good render on a compile error (so an
  * in-progress edit never blanks the view). Plugin/component options are read at compile time; pass
- * stable references (module-level arrays) if they matter.
+ * stable references (module-level arrays) if they matter. `options.codeTheme` is the one exception:
+ * it also triggers a recompile on its own when it changes, even if `source` hasn't.
  */
 export function useSuperloreMdx(
   source: string,
@@ -148,6 +162,12 @@ export function useSuperloreMdx(
   useEffect(() => {
     optionsRef.current = options;
   });
+
+  // codeTheme is the one option meant to be reactive on its own — a host's light/dark (or full
+  // color-scheme) switch should recolor code without the doc's `source` changing. Its two string
+  // values are stable primitives (unlike the option object itself), so they're safe effect deps.
+  const codeThemeLight = options.codeTheme?.light;
+  const codeThemeDark = options.codeTheme?.dark;
 
   useEffect(() => {
     let cancelled = false;
@@ -167,7 +187,7 @@ export function useSuperloreMdx(
     return () => {
       cancelled = true;
     };
-  }, [source]);
+  }, [source, codeThemeLight, codeThemeDark]);
 
   return state;
 }
@@ -280,6 +300,7 @@ export function SuperloreDoc({
   components,
   remarkPlugins,
   rehypePlugins,
+  codeTheme,
   onFrontmatter,
   onError,
   fallback = null,
@@ -288,6 +309,7 @@ export function SuperloreDoc({
     components,
     remarkPlugins,
     rehypePlugins,
+    codeTheme,
   });
 
   // Brand tokens + theme: own props win over a surrounding SuperloreTheme. Tokens are applied as inline

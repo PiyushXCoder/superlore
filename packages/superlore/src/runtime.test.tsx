@@ -1,5 +1,5 @@
 import { render, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SuperloreDoc, SuperloreTheme } from "./runtime";
 
 // The scoped `superlore/runtime.css` defines default tokens ON `.superlore-doc`. So a host's brand
@@ -66,5 +66,26 @@ describe("SuperloreDoc theming", () => {
   it("hides the badge when badge={false}", async () => {
     const el = await docEl(<SuperloreDoc source={MDX} badge={false} />);
     expect(el.querySelector('a[aria-label="Powered by superlore"]')).toBeNull();
+  });
+
+  it("recompiles when codeTheme changes even though source stays the same", async () => {
+    const onFrontmatter = vi.fn();
+    const { rerender } = render(
+      <SuperloreDoc
+        source={MDX}
+        onFrontmatter={onFrontmatter}
+        codeTheme={{ light: "min-light", dark: "min-light" }}
+      />,
+    );
+    await waitFor(() => expect(onFrontmatter).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <SuperloreDoc
+        source={MDX}
+        onFrontmatter={onFrontmatter}
+        codeTheme={{ light: "min-dark", dark: "min-dark" }}
+      />,
+    );
+    await waitFor(() => expect(onFrontmatter).toHaveBeenCalledTimes(2));
   });
 });
